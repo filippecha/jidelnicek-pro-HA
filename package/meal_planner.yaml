@@ -1,0 +1,248 @@
+# ----------------------------------------------------------------------
+# 🥗 HOME ASSISTANT MEAL PLANNER PACKAGE
+# ----------------------------------------------------------------------
+# Tento balíček obsahuje konfiguraci pro plánování jídelníčku.
+# Vyžaduje vytvořené To-Do seznamy (viz README).
+
+# 1. DEFINICE SEZNAMŮ JÍDEL (ZDROJE)
+input_select:
+  # Zdrojové seznamy pro výběr (pouze ukázka 5 jídel)
+  dummy_snidane:
+    name: "Snídaně list"
+    options: &seznam_snidane
+      - "---"
+      - "Avokádový toast + vejce"
+      - "Chia káva + jogurt"
+      - "Míchaná vejce na cibulce"
+      - "Ovesná kaše s ovocem"
+      - "Párky s hořčicí"
+
+  dummy_obed:
+    name: "Oběd list"
+    options: &seznam_obed
+      - "---"
+      - "Burrito + losos"
+      - "Cuketa plněná masem"
+      - "Kuře na paprice"
+      - "Svíčková na smetaně"
+      - "Řízek s bramborovým salátem"
+
+  dummy_svacina:
+    name: "Svačina list"
+    options: &seznam_svacina
+      - "---"
+      - "Jablko"
+      - "Jogurt s vločkami"
+      - "Kefírové mléko"
+      - "Obložený chléb"
+      - "Tyčinka proteínová"
+
+  dummy_vecere:
+    name: "Večeře list"
+    options: &seznam_vecere
+      - "---"
+      - "Avokádový toast + vejce"
+      - "Burrito + losos"
+      - "Gulášová polévka"
+      - "Těstovinový salát"
+      - "Zeleninový salát s tuňákem"
+
+  # Výběr receptu pro zobrazení surovin (Frontend)
+  vyber_receptu:
+    name: "Vyber recept pro zobrazení surovin"
+    icon: mdi:chef-hat
+    options:
+      - "Avokádový toast + vejce"
+      - "Burrito + losos"
+      - "Cuketa plněná masem"
+      - "Chia káva + jogurt"
+      - "Kuře na paprice"
+
+  # ------------------------------------------------------------------
+  # DEFINICE DNŮ (14 dní - Lichý/Sudý týden)
+  # ------------------------------------------------------------------
+  # Týden 1 (Lichý)
+  menu_t1_po_snidane: { name: "Lichý Po Snídaně", icon: mdi:coffee, options: *seznam_snidane }
+  menu_t1_po_obed:    { name: "Lichý Po Oběd", icon: mdi:food, options: *seznam_obed }
+  menu_t1_po_svacina: { name: "Lichý Po Svačina", icon: mdi:apple, options: *seznam_svacina }
+  menu_t1_po_vecere:  { name: "Lichý Po Večeře", icon: mdi:food-variant, options: *seznam_vecere }
+  # ... (Zde by pokračovaly definice pro Út-Ne pro T1 a T2. Pro přehlednost zkráceno.)
+  # Uživatel si zde musí doplnit zbytek dní podle vzoru výše.
+
+# 2. SENZORY (Kalorie) - Ukázka
+template:
+  - sensor:
+      - name: "Kalorie T1 Po Snídaně"
+        unique_id: kalorie_lichy_po_snidane
+        unit_of_measurement: "kcal"
+        state: >
+          {% set mapa = {
+            "Avokádový toast + vejce": 350,
+            "Chia káva + jogurt": 250,
+            "Míchaná vejce na cibulce": 400
+          } %}
+          {{ mapa.get(states('input_select.menu_t1_po_snidane'), 0) }}
+
+# 3. SKRIPT NA GENEROVÁNÍ NÁKUPU
+script:
+  planovac_pridat_den_do_nakupu:
+    alias: Plánovač - Přidat den do nákupu
+    icon: mdi:cart-plus
+    description: "Převede jídla z vybraného dne na suroviny a přidá je do nákupních seznamů."
+    fields:
+      den:
+        description: Zkratka dne (po, ut...)
+        example: po
+      tyden:
+        description: Označení týdne (t1/t2)
+        example: t1
+    sequence:
+      # 1. Vymazání hotových položek ze seznamů
+      - action: todo.remove_completed_items
+        target:
+          entity_id:
+            - todo.nakupni_seznam_pecivo
+            - todo.nakupni_seznam_ovoce_a_zelenina
+            - todo.nakupni_seznam_chladaky
+            - todo.nakupni_seznam_maso
+            - todo.nakupni_seznam_napoje
+            - todo.nakupni_seznam_mrazene
+            - todo.nakupni_seznam_drogerie_a_domacnost
+            - todo.nakupni_seznam_ostatni
+      
+      # 2. Definice receptů a surovin
+      - variables:
+          recepty:
+            "---": []
+            "Avokádový toast + vejce":
+              - Avokádo
+              - Chléb
+              - Vejce
+            "Burrito + losos":
+              - Tortilla
+              - Losos
+              - Fazole
+              - Kukuřice
+            "Cuketa plněná masem":
+              - Cuketa
+              - Mleté maso
+              - Sýr
+            "Chia káva + jogurt":
+              - Chia semínka
+              - Jogurt bílý
+              - Káva
+            "Kuře na paprice":
+              - Kuře
+              - Smetana
+              - Těstoviny
+              - Paprika sladká
+
+          # Mapování surovin do konkrétních seznamů
+          mapa_seznamu:
+            Avokádo: todo.nakupni_seznam_ovoce_a_zelenina
+            Cuketa: todo.nakupni_seznam_ovoce_a_zelenina
+            Chléb: todo.nakupni_seznam_pecivo
+            Káva: todo.nakupni_seznam_ostatni
+            Kuře: todo.nakupni_seznam_maso
+            Losos: todo.nakupni_seznam_maso
+            Mleté maso: todo.nakupni_seznam_maso
+            Smetana: todo.nakupni_seznam_chladaky
+            Sýr: todo.nakupni_seznam_chladaky
+            Tortilla: todo.nakupni_seznam_pecivo
+            Vejce: todo.nakupni_seznam_chladaky
+          
+          vsechny_seznamy:
+            - todo.nakupni_seznam_pecivo
+            - todo.nakupni_seznam_ovoce_a_zelenina
+            - todo.nakupni_seznam_chladaky
+            - todo.nakupni_seznam_maso
+            - todo.nakupni_seznam_napoje
+            - todo.nakupni_seznam_mrazene
+            - todo.nakupni_seznam_drogerie_a_domacnost
+            - todo.nakupni_seznam_ostatni
+
+      # 3. Logika přidání (Loop)
+      - repeat:
+          for_each: "{{ vsechny_seznamy }}"
+          sequence:
+            - variables:
+                aktualni_seznam: "{{ repeat.item }}"
+            - action: todo.get_items
+              target:
+                entity_id: "{{ aktualni_seznam }}"
+              response_variable: seznam
+            - variables:
+                vsechny_polozky: |-
+                  {% set ns = namespace(items={}) %}
+                  {# Načtení stávajících položek #}
+                  {% if seznam and aktualni_seznam in seznam %}
+                    {% for i in seznam[aktualni_seznam]['items'] %}
+                      {% set t = i.summary %}
+                      {% if 'x ' in t %}
+                        {% set c = t.split('x ')[0] | int(1) %}
+                        {% set n = t.split('x ')[1] %}
+                      {% else %}
+                        {% set c = 1 %}
+                        {% set n = t %}
+                      {% endif %}
+                      {% set ns.items = dict(ns.items, **{n: ns.items.get(n, 0) + c}) %}
+                    {% endfor %}
+                  {% endif %}
+                  {# Přidání nových surovin z menu #}
+                  {% for chod in ['snidane','obed','svacina','vecere'] %}
+                    {% set e = 'input_select.menu_' ~ tyden ~ '_' ~ den ~ '_' ~ chod %}
+                    {% set jidlo = states(e) | default('---') %}
+                    {% if jidlo in recepty %}
+                      {% for p in recepty[jidlo] %}
+                        {% if mapa_seznamu.get(p, 'todo.nakupni_seznam_ostatni') == aktualni_seznam %}
+                          {% set ns.items = dict(ns.items, **{p: ns.items.get(p, 0) + 1}) %}
+                        {% endif %}
+                      {% endfor %}
+                    {% endif %}
+                  {% endfor %} {{ ns.items }}
+            # Čištění a opětovné přidání (pro sčítání položek)
+            - if:
+                - condition: template
+                  value_template: "{{ seznam[aktualni_seznam]['items'] | length > 0 }}"
+              then:
+                - repeat:
+                    for_each: "{{ seznam[aktualni_seznam]['items'] }}"
+                    sequence:
+                      - action: todo.remove_item
+                        target:
+                          entity_id: "{{ aktualni_seznam }}"
+                        data:
+                          item: "{{ repeat.item.summary }}"
+            - repeat:
+                for_each: "{{ vsechny_polozky | dictsort }}"
+                sequence:
+                  - action: todo.add_item
+                    target:
+                      entity_id: "{{ aktualni_seznam }}"
+                    data:
+                      item: >-
+                        {% set n = repeat.item[0] %} {% set c = repeat.item[1] %} {%
+                        if c > 1 %}{{ c }}x {{ n }}{% else %}{{ n }}{% endif %}
+
+# 4. AUTOMATIZACE (Úklid)
+automation:
+  - alias: Jídelníček - Vymazat dnešní den
+    description: "Každý den ve 21:00 vyresetuje jídelníček pro aktuální den."
+    triggers:
+      - at: "21:00:00"
+        trigger: time
+    actions:
+      - variables:
+          dny_zkratky: [po, ut, st, ct, pa, so, ne]
+          den: "{{ dny_zkratky[now().weekday()] }}"
+          prefix: "{{ 't1' if now().isocalendar().week % 2 != 0 else 't2' }}"
+      - target:
+          entity_id:
+            - input_select.menu_{{ prefix }}_{{ den }}_snidane
+            - input_select.menu_{{ prefix }}_{{ den }}_obed
+            - input_select.menu_{{ prefix }}_{{ den }}_svacina
+            - input_select.menu_{{ prefix }}_{{ den }}_vecere
+        data:
+          option: "---"
+        action: input_select.select_option
+    mode: single
