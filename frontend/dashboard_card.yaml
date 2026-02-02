@@ -1,0 +1,75 @@
+# Karta pro Dashboard - Přehled jídelníčku
+# Vyžaduje: custom:auto-entities, custom:card-mod
+type: custom:auto-entities
+card:
+  type: grid
+  columns: 4 # Na PC 4 sloupce, na mobilu 1 (řešeno přes visibility v druhé kartě)
+  square: false
+  card_mod: null
+card_param: cards
+filter:
+  template: >
+    {% set ns = namespace(cards=[], snidane_list=[], obed_list=[], svacina_list=[], vecere_list=[]) %}
+    {% set dny_zkratky = ['po','ut','st','ct','pa','so','ne'] %}
+    {% set dny_nazvy = ['Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota','Neděle'] %}
+
+    {# SBĚR DAT #}
+    {% for i in range(14) %}
+      {% set date = now() + timedelta(days=i) %}
+      {% set wd = date.weekday() %}
+      {% set den = dny_zkratky[wd] %}
+      {% set ciso_tydne = date.isocalendar().week %}
+      {% if ciso_tydne % 2 != 0 %}{% set prefix = 't1' %}{% else %}{% set prefix = 't2' %}{% endif %}
+      {% set ns.snidane_list = ns.snidane_list + [states('input_select.menu_' ~ prefix ~ '_' ~ den ~ '_snidane') | trim] %}
+      {% set ns.obed_list = ns.obed_list + [states('input_select.menu_' ~ prefix ~ '_' ~ den ~ '_obed') | trim] %}
+      {% set ns.svacina_list = ns.svacina_list + [states('input_select.menu_' ~ prefix ~ '_' ~ den ~ '_svacina') | trim] %}
+      {% set ns.vecere_list = ns.vecere_list + [states('input_select.menu_' ~ prefix ~ '_' ~ den ~ '_vecere') | trim] %}
+    {% endfor %}
+
+    {# STYLY #}
+    {% set styl_alert = {'style': ':host { --paper-item-icon-color: red !important; --mdc-select-ink-color: red !important; --primary-text-color: red !important; --secondary-text-color: red !important; }'} %}
+    {% set styl_ok = {} %}
+
+    {# GENEROVÁNÍ #}
+    {% for i in range(14) %}  
+      {% set date = now() + timedelta(days=i) %}
+      {% set wd = date.weekday() %}
+      {% set den = dny_zkratky[wd] %}
+      {% set nazev = dny_nazvy[wd] %}
+      {% set datum = date.day ~ '. ' ~ date.month ~ '.' %}
+      {% set ciso_tydne = date.isocalendar().week %}
+      {% if ciso_tydne % 2 != 0 %}{% set prefix = 't1' %}{% else %}{% set prefix = 't2' %}{% endif %}
+      {% set s_val = ns.snidane_list[i] %}
+      {% set o_val = ns.obed_list[i] %}
+      {% set sv_val = ns.svacina_list[i] %}
+      {% set v_val = ns.vecere_list[i] %}
+
+      {% set card = {
+        'type': 'entities',
+        'title': nazev ~ ' ' ~ datum,
+        'show_header_toggle': false,
+        'state_color': true,
+        'card_mod': {'style': 'ha-card { background: white !important; border: 1px solid rgba(0,0,0,0.1) !important; color: black !important; --primary-text-color: black !important; --secondary-text-color: #555 !important; } .card-header { color: black !important; }'},
+        'entities': [
+          {'entity': 'input_select.menu_' ~ prefix ~ '_' ~ den ~ '_snidane', 'name': 'Snídaně', 'card_mod': styl_alert if (s_val not in ['---', 'unknown', 'unavailable'] and ns.snidane_list.count(s_val) > 1) else styl_ok},
+          {'entity': 'input_select.menu_' ~ prefix ~ '_' ~ den ~ '_obed', 'name': 'Oběd', 'card_mod': styl_alert if (o_val not in ['---', 'unknown', 'unavailable'] and ns.obed_list.count(o_val) > 1) else styl_ok},
+          {'entity': 'input_select.menu_' ~ prefix ~ '_' ~ den ~ '_svacina', 'name': 'Svačina', 'card_mod': styl_alert if (sv_val not in ['---', 'unknown', 'unavailable'] and ns.svacina_list.count(sv_val) > 1) else styl_ok},
+          {'entity': 'input_select.menu_' ~ prefix ~ '_' ~ den ~ '_vecere', 'name': 'Večeře', 'card_mod': styl_alert if (v_val not in ['---', 'unknown', 'unavailable'] and ns.vecere_list.count(v_val) > 1) else styl_ok},
+          {'type': 'divider'},
+          {
+            'type': 'button', 'icon': 'mdi:trash-can-outline', 'name': ' ', 'action_name': 'SMAZAT',
+            'tap_action': {'action': 'call-service', 'service': 'input_select.select_option', 'target': {'entity_id': ['input_select.menu_' ~ prefix ~ '_' ~ den ~ '_snidane', 'input_select.menu_' ~ prefix ~ '_' ~ den ~ '_obed', 'input_select.menu_' ~ prefix ~ '_' ~ den ~ '_svacina', 'input_select.menu_' ~ prefix ~ '_' ~ den ~ '_vecere']}, 'data': {'option': '---'}, 'confirmation': {'text': 'Opravdu vymazat celý den?'}}
+          },
+          {
+            'type': 'button', 'icon': 'mdi:cart-plus', 'name': ' ', 'action_name': 'DO KOŠÍKU',
+            'tap_action': {'action': 'call-service', 'service': 'script.planovac_pridat_den_do_nakupu', 'data': {'den': den, 'tyden': prefix}, 'confirmation': {'text': 'Přidat nákup pro ' ~ nazev ~ '?'}}
+          }
+        ]
+      } %}
+      {% set ns.cards = ns.cards + [card] %}
+    {% endfor %} {{ ns.cards }}
+grid_options:
+  columns: full
+visibility:
+  - condition: screen
+    media_query: "(min-width: 1024px)"
