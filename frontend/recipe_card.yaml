@@ -1,0 +1,45 @@
+type: vertical-stack
+cards:
+  - type: entities
+    entities:
+      - entity: input_select.vyber_receptu
+        name: Vyberte jídlo
+    card_mod:
+      style: |
+        ha-card {
+          background: white !important;
+          color: black !important;
+          border: 1px solid rgba(0,0,0,0.1) !important;
+          --primary-text-color: black !important;
+          --secondary-text-color: #555 !important;
+        }
+  - type: markdown
+    content: |
+      {% set recepty = {
+        "Avokádový toast + vejce": ["Avokádo", "Chléb", "Vejce"],
+        "Burrito + losos": ["Tortilla", "Losos", "Zelenina", "Sýr"],
+        "Cuketa plněná masem": ["Cuketa", "Mleté maso", "Sýr"],
+        "Chia káva + jogurt": ["Chia semínka", "Jogurt bílý", "Káva"],
+        "Kuře na paprice": ["Kuře", "Smetana", "Těstoviny"]
+      } %}
+      {% set vybrane_jidlo = states('input_select.vyber_receptu') %}
+      
+      ## {{ vybrane_jidlo }}
+      
+      {% if vybrane_jidlo in recepty %}
+        {% for surovina in recepty[vybrane_jidlo] %}
+      - {{ surovina }}
+        {% endfor %}
+      {% else %}
+      *Vyberte jídlo ze seznamu.*
+      {% endif %}
+    card_mod:
+      style: |
+        ha-card {
+          background: white !important;
+          color: black !important;
+          border: 1px solid rgba(0,0,0,0.1) !important;
+          font-size: 16px !important;
+          padding: 20px !important;
+        }
+        h2 { color: black !important; margin-top: 0px !important; }
